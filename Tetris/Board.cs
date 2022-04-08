@@ -1,7 +1,7 @@
 public class Board
 {
     public Block[,] grid;
-    readonly float timeBetweenUpdate = 0.7f;
+    readonly float timeBetweenUpdate = 0.2f;
     float timeTillNextUpdate;
     public Board()
     {
@@ -9,6 +9,10 @@ public class Board
         timeTillNextUpdate = timeBetweenUpdate;
 
         grid[5, 2] = new Block(Color.BLACK);
+        grid[6, 2] = new Block(Color.BLACK);
+        grid[5, 3] = new Block(Color.BLACK);
+        grid[5, 4] = new Block(Color.BLACK);
+        grid[5, 5] = new Block(Color.BLACK);
     }
     public void Update()
     {
@@ -22,88 +26,88 @@ public class Board
             playerMove = Move.Right;
 
         if (playerMove != Move.None)
-            if (CanDoMove(playerMove))
-            {
-                DoPlayerMove(playerMove);
-            }
-
+            MoveActiveBlocks(playerMove);
 
         // Perform a "game tick"
         if (timeTillNextUpdate <= 0)
         {
-            MoveActiveBlocksDown();
+            MoveActiveBlocks(Move.Down);
             timeTillNextUpdate = timeBetweenUpdate;
         }
     }
-    private bool CanDoMove(Move playerMove)
+    private void MoveActiveBlocks(Move move)
     {
-        bool canDoMove = true;
+        Dictionary<(int, int), (int, int)> blocksToMove = new Dictionary<(int, int), (int, int)>(); // Lists of all blocks that has already been moved so we dont accidentally move same block twice
+
         for (int x = 0; x < grid.GetLength(0); x++)
         {
             for (int y = 0; y < grid.GetLength(1); y++)
             {
                 if (grid[x, y] != null && grid[x, y].isActive)
                 {
-                    if (playerMove == Move.Left)
-                    {
-                        if (x - 1 < 0 || (grid[x - 1, y] != null && !grid[x - 1, y].isActive))
-                            canDoMove = false;
-                    }
-                    if (playerMove == Move.Right)
-                    {
-                        if (x + 1 > grid.GetLength(0) - 1 || (grid[x + 1, y] != null && !grid[x + 1, y].isActive))
-                            canDoMove = false;
-                    }
-                }
-            }
-        }
-        return canDoMove;
-    }
-    private void DoPlayerMove(Move playerMove)
-    {
-        Console.WriteLine("pls");
-
-        List<Block> alreadyMoved = new List<Block>(); // Lists of all blocks that has already been moved so we dont accidentally move same block twice
-
-        for (int x = 0; x < grid.GetLength(0); x++)
-        {
-            for (int y = 0; y < grid.GetLength(1); y++)
-            {
-                if (grid[x, y] != null && grid[x, y].isActive && !alreadyMoved.Contains(grid[x, y]))
-                {
-                    if (playerMove == Move.Left)
-                    {
-                        alreadyMoved.Add(grid[x, y]);
-                        grid[x - 1, y] = grid[x, y];
-                        grid[x, y] = null;
-                        Console.WriteLine(x);
-                    }
-                    if (playerMove == Move.Right)
-                    {
-                        alreadyMoved.Add(grid[x, y]);
-                        grid[x + 1, y] = grid[x, y];
-                        grid[x, y] = null;
-                    }
+                    if (move == Move.Left)
+                        blocksToMove.Add((x, y), (x - 1, y));
+                    if (move == Move.Right)
+                        blocksToMove.Add((x, y), (x + 1, y));
+                    if (move == Move.Down)
+                        blocksToMove.Add((x, y), (x, y + 1));
                 }
             }
         }
 
-    }
-    private void MoveActiveBlocksDown()
-    {
-        List<Block> alreadyMoved = new List<Block>(); // Lists of all blocks that has already been moved so we dont insta move every block basically
-
+        bool validMove = true;
         for (int x = 0; x < grid.GetLength(0); x++)
         {
             for (int y = 0; y < grid.GetLength(1); y++)
             {
-                if (grid[x, y] != null && grid[x, y].isActive && !alreadyMoved.Contains(grid[x, y]))
+                if (blocksToMove.ContainsKey((x, y)))
                 {
-                    alreadyMoved.Add(grid[x, y]);
-                    grid[x, y + 1] = grid[x, y];
-                    grid[x, y] = null;
+                    if (blocksToMove[(x, y)].Item1 > grid.GetLength(0) - 1 || blocksToMove[(x, y)].Item1 < 0)
+                    {
+                        validMove = false;
+                        continue;
+                    }
+                    if (blocksToMove[(x, y)].Item2 > grid.GetLength(1) - 1)
+                    {
+                        validMove = false;
+                        PieceIsDone(blocksToMove);
+                        grid[0, 0] = new Block(Color.GOLD);
+                        return;
+                    }
+                    if (grid[blocksToMove[(x, y)].Item1, blocksToMove[(x, y)].Item2] != null && !grid[blocksToMove[(x, y)].Item1, blocksToMove[(x, y)].Item2].isActive)
+                    {
+                        validMove = false;
+                        if (blocksToMove[(x, y)].Item2 > y)
+                        {
+                            PieceIsDone(blocksToMove);
+                            grid[0, 0] = new Block(Color.GOLD);
+                            grid[1, 0] = new Block(Color.GOLD);
+
+                            return;
+                        }
+                    }
                 }
             }
+        }
+
+
+        if (validMove)
+        {
+            foreach (var item in blocksToMove)
+            {
+                grid[item.Key.Item1, item.Key.Item2] = null;
+            }
+            foreach (var item in blocksToMove)
+            {
+                grid[item.Value.Item1, item.Value.Item2] = new Block(Color.BEIGE);
+            }
+        }
+    }
+    private void PieceIsDone(Dictionary<(int, int), (int, int)> completedPiece)
+    {
+        foreach (var item in completedPiece)
+        {
+            grid[item.Key.Item1, item.Key.Item2] = new Block(Color.BLACK) { isActive = false };
         }
     }
     public void Draw()
@@ -119,12 +123,10 @@ public class Board
         {
             for (int y = 0; y < grid.GetLength(1); y++)
             {
-                if (grid[x, y] != null && grid[x, y].isActive)
+                if (grid[x, y] != null)
                 {
                     Raylib.DrawRectangle(x * blockSize + (int)arena.x, y * blockSize + (int)arena.y, blockSize - 1, blockSize - 1, grid[x, y].color);
                 }
-
-
             }
         }
 
@@ -156,5 +158,7 @@ enum Move
 {
     None,
     Left,
-    Right
+    Right,
+    Down,
+    InstaDown
 }
