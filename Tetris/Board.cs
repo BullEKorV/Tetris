@@ -1,18 +1,13 @@
 public class Board
 {
     public Block[,] grid;
+    List<Piece> piecesUpNext = new List<Piece>();
     readonly float timeBetweenUpdate = 0.2f;
     float timeTillNextUpdate;
     public Board()
     {
         grid = new Block[10, 21];
         timeTillNextUpdate = timeBetweenUpdate;
-
-        grid[5, 2] = new Block(Color.BLACK);
-        grid[6, 2] = new Block(Color.BLACK);
-        grid[5, 3] = new Block(Color.BLACK);
-        grid[5, 4] = new Block(Color.BLACK);
-        grid[5, 5] = new Block(Color.BLACK);
     }
     public void Update()
     {
@@ -33,6 +28,9 @@ public class Board
         if (Raylib.IsKeyPressed(KeyboardKey.KEY_C))
             SpawnPiece();
 
+        while (piecesUpNext.Count < 3)
+            piecesUpNext.Add(GetPiece());
+
         // Commit to player move
         MoveActiveBlocks(playerMove);
 
@@ -46,39 +44,40 @@ public class Board
     #region Spawning
     private void SpawnPiece()
     {
-        (int, int)[] piece = GetPiece();
-        Color color = Color.BEIGE;
+        Piece piece = piecesUpNext.First();
+        piecesUpNext.Remove(piece);
 
+        // Find center 
         int pieceCenterX = (int)MathF.Ceiling((float)GetPieceWidth(piece) / 2);
 
         // Actually place block
-        foreach ((int, int) block in piece)
+        foreach ((int, int) block in piece.blocks)
         {
-            grid[(grid.GetLength(0) / 2) - pieceCenterX + block.Item1, block.Item2] = new Block(color);
+            grid[(grid.GetLength(0) / 2) - pieceCenterX + block.Item1, block.Item2] = new Block(piece.color);
         }
 
         timeTillNextUpdate = timeBetweenUpdate;
     }
-    private int GetPieceWidth((int, int)[] piece)
+    private int GetPieceWidth(Piece piece)
     {
         int width = 0;
-        foreach ((int, int) block in piece)
+        foreach ((int, int) block in piece.blocks)
         {
             width = block.Item1 > width ? block.Item1 : width;
         }
-        return width + 1; // + 1 because array ints start at 0
+        return width + 1; // +1 because array ints start at 0
     }
-    private int GetPieceHeight((int, int)[] piece)
+    private int GetPieceHeight(Piece piece)
     {
         int height = 0;
-        foreach ((int, int) block in piece)
+        foreach ((int, int) block in piece.blocks)
         {
             height = block.Item2 > height ? block.Item2 : height;
         }
-        return height;
+        return height + 1; // +1 because array ints start at 0
     }
 
-    private (int, int)[] GetPiece()
+    private Piece GetPiece()
     {
         (int, int)[][] allPieces = {
            new (int,int)[] // line piece
@@ -90,31 +89,32 @@ public class Board
            {(0,0),
             (1,0),
             (0,1),
-            (1,1)},
-            new (int,int)[] // L piece right
-           {(0,1),
-            (1,1),
-            (2,1),
-            (2,0)},
-            new (int,int)[] // L piece left
-           {(0,0),
-            (0,1),
-            (1,1),
-            (2,1)},
-            new (int,int)[] // Squiggly piece left
-           {(0,0),
-            (1,0),
-            (1,1),
-            (2,1)},
-            new (int,int)[] // Squiggly piece right
-           {(0,1),
-            (1,1),
-            (1,0),
-            (2,0)}
+            (1,1)}
+        //     new (int,int)[] // L piece right
+        //    {(0,1),
+        //     (1,1),
+        //     (2,1),
+        //     (2,0)},
+        //     new (int,int)[] // L piece left
+        //    {(0,0),
+        //     (0,1),
+        //     (1,1),
+        //     (2,1)},
+        //     new (int,int)[] // Squiggly piece left
+        //    {(0,0),
+        //     (1,0),
+        //     (1,1),
+        //     (2,1)},
+        //     new (int,int)[] // Squiggly piece right
+        //    {(0,1),
+        //     (1,1),
+        //     (1,0),
+        //     (2,0)}
         };
+        List<Color> allColors = new List<Color>() { Color.RED, Color.BLUE, Color.YELLOW, Color.PINK };
 
         Random rnd = new Random();
-        (int, int)[] piece = allPieces[rnd.Next(0, allPieces.Length)];
+        Piece piece = new Piece(allPieces[rnd.Next(0, allPieces.Length)], allColors[rnd.Next(0, allColors.Count)]);
 
 
         return piece;
@@ -146,16 +146,14 @@ public class Board
         if (move == Move.InstaDown)
             blocksToMove = GetPiecePositionInstaDown();
 
+        // Move blocks to coords specified
+        MoveBlocksToCoords(blocksToMove);
+    }
+
+    private void MoveBlocksToCoords(Dictionary<(int, int), (int, int)> blocksToMove)
+    {
         // Find color of the piece
-        Color pieceColor = new Color();
-        foreach (Block block in grid)
-        {
-            if (block != null && block.isActive)
-            {
-                pieceColor = block.color;
-                break; /// ???? DOES IT REALLY BREAK?!?!=!?!
-            }
-        }
+        Color pieceColor = GetActiveColor();
 
         // Replace old blocks with the new blocks aka move them
         if (ValidMove(blocksToMove))
@@ -243,6 +241,35 @@ public class Board
         }
         return true;
     }
+    private void DeleteFullRows()
+    {
+        int[] rowsToDelete = GetFullRows();
+
+        if (rowsToDelete.Length == 0) return;
+
+        Dictionary<(int, int), (int, int)> blocksToMove = new Dictionary<(int, int), (int, int)>();
+
+        // Finds blocks above deleted rows to move down
+        for (int y = 0; y < rowsToDelete.Max(); y++)
+        {
+            for (int x = 0; x < grid.GetLength(0); x++)
+            {
+                if (grid[x, y] != null)
+                    blocksToMove.Add((x, y), (x, y + rowsToDelete.Length));
+            }
+        }
+        Console.WriteLine(blocksToMove.Count);
+        // Delete rows
+        for (int y = rowsToDelete.Min(); y < rowsToDelete.Min() + rowsToDelete.Length; y++)
+        {
+            for (int x = 0; x < grid.GetLength(0); x++)
+            {
+                grid[x, y] = null;
+            }
+        }
+
+        MoveBlocksToCoords(blocksToMove);
+    }
     private void PieceIsDone(Dictionary<(int, int), (int, int)> completedPiece)
     {
         foreach (Block block in grid)
@@ -250,6 +277,33 @@ public class Board
             if (block != null)
                 block.isActive = false;
         }
+        DeleteFullRows();
+    }
+    #endregion
+    #region Data gathering
+    private Color GetActiveColor()
+    {
+        foreach (Block block in grid)
+        {
+            if (block != null && block.isActive)
+                return block.color;
+        }
+        return Color.WHITE;
+    }
+    private int[] GetFullRows()
+    {
+        List<int> rowNumbers = new List<int>();
+        // full
+        for (int y = 0; y < grid.GetLength(1); y++)
+        {
+            for (int x = 0; x < grid.GetLength(0); x++)
+            {
+                if (grid[x, y] == null || grid[x, y].isActive)
+                    break;
+                if (x == grid.GetLength(0) - 1) rowNumbers.Add(y);
+            }
+        }
+        return rowNumbers.ToArray();
     }
     #endregion
     #region Drawing
@@ -259,7 +313,7 @@ public class Board
 
         // Draw arena
         Rectangle arena = new Rectangle((Raylib.GetScreenWidth() - blockSize * grid.GetLength(0)) * 0.5f, -blockSize * 0.5f, blockSize * grid.GetLength(0), blockSize * grid.GetLength(1));
-        Raylib.DrawRectangleLinesEx(arena, 5, Color.BLUE);
+        Raylib.DrawRectangleLinesEx(new Rectangle(arena.x - 5, arena.y, arena.width + 10, arena.height + 5), 5, Color.BLUE);
 
         // Draw individual blocks
         for (int x = 0; x < grid.GetLength(0); x++)
@@ -268,12 +322,31 @@ public class Board
             {
                 if (grid[x, y] != null)
                 {
-                    Raylib.DrawRectangle(x * blockSize + (int)arena.x, y * blockSize + (int)arena.y, blockSize - 1, blockSize - 1, grid[x, y].color);
+                    Raylib.DrawRectangle(x * blockSize + (int)arena.x + 1, y * blockSize + (int)arena.y + 1, blockSize - 2, blockSize - 2, grid[x, y].color);
                 }
             }
         }
+
+        // Draw side up next 
+        for (int i = 0; i < piecesUpNext.Count; i++)
+        {
+            for (int x = 0; x < piecesUpNext.ElementAt(i).blocks.Length; x++)
+            {
+                Raylib.DrawRectangle((int)arena.x + (int)arena.width + 30 + piecesUpNext.ElementAt(i).blocks[x].Item1 * blockSize, 50 + i * blockSize * 3 + piecesUpNext.ElementAt(i).blocks[x].Item2 * blockSize, blockSize - 1, blockSize - 1, piecesUpNext.ElementAt(i).color);
+            }
+        }
+
+        // Draw highlight where block will land
+        Dictionary<(int, int), (int, int)> highlightBlocks = new Dictionary<(int, int), (int, int)>();
+        highlightBlocks = GetPiecePositionInstaDown();
+
+        foreach (var block in highlightBlocks)
+        {
+            Rectangle outline = new Rectangle((int)arena.x + block.Value.Item1 * blockSize + 1, (int)arena.y + block.Value.Item2 * blockSize + 1, blockSize - 2, blockSize - 2);
+            Raylib.DrawRectangleLinesEx(outline, 3, GetActiveColor());
+        }
     }
-    #endregion   
+    #endregion
 }
 enum Move
 {
