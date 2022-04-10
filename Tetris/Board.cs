@@ -123,6 +123,8 @@ public class Board
     #region Moving blocks
     private void MoveActiveBlocks(Move move)
     {
+        if (move == Move.None) return;
+
         Dictionary<(int, int), (int, int)> blocksToMove = new Dictionary<(int, int), (int, int)>(); // Lists of all blocks that has already been moved so we dont accidentally move same block twice
 
         // Get the desired new location for all of the blocks
@@ -144,7 +146,12 @@ public class Board
 
         // For the insta down move
         if (move == Move.InstaDown)
+        {
             blocksToMove = GetPiecePositionInstaDown();
+            MoveBlocksToCoords(blocksToMove);
+            PieceIsDone(blocksToMove);
+            return;
+        }
 
         // Move blocks to coords specified
         MoveBlocksToCoords(blocksToMove);
@@ -153,9 +160,38 @@ public class Board
     private void MoveBlocksToCoords(Dictionary<(int, int), (int, int)> blocksToMove)
     {
         // Find color of the piece
-        Color pieceColor = GetActiveColor();
+        // Color pieceColor = GetActiveColor();
+
+        foreach (var blok in blocksToMove)
+        {
+            // Console.WriteLine(blok.Key.Item1 + " " + blok.Key.Item2 + " " + blok.Value.Item1 + " " + blok.Value.Item2);
+        }
+
+        Console.WriteLine(blocksToMove.Count);
+
+        List<Color> blockColors = new List<Color>();
+        for (int x = 0; x < grid.GetLength(0); x++)
+        {
+            for (int y = 0; y < grid.GetLength(1); y++)
+            {
+                if (blocksToMove.ContainsKey((x, y)))
+                {
+                    // Console.WriteLine(blocksToMove.Count + " " + blockColors.Count);
+                    try
+                    {
+                        blockColors.Add(grid[x, y].color);
+
+                    }
+                    catch (System.Exception e)
+                    {
+                        Console.WriteLine(e.Message);
+                    }
+                }
+            }
+        }
 
         // Replace old blocks with the new blocks aka move them
+        int c = 0;
         if (ValidMove(blocksToMove))
         {
             foreach (var item in blocksToMove)
@@ -164,7 +200,8 @@ public class Board
             }
             foreach (var item in blocksToMove)
             {
-                grid[item.Value.Item1, item.Value.Item2] = new Block(pieceColor);
+                grid[item.Value.Item1, item.Value.Item2] = new Block(blockColors[c]);
+                c++;
             }
         }
     }
@@ -250,17 +287,21 @@ public class Board
         Dictionary<(int, int), (int, int)> blocksToMove = new Dictionary<(int, int), (int, int)>();
 
         // Finds blocks above deleted rows to move down
-        for (int y = 0; y < rowsToDelete.Max(); y++)
+        for (int y = 0; y < rowsToDelete.Min(); y++)
         {
             for (int x = 0; x < grid.GetLength(0); x++)
             {
                 if (grid[x, y] != null)
+                {
                     blocksToMove.Add((x, y), (x, y + rowsToDelete.Length));
+                    grid[x, y].isActive = true;
+                    Console.WriteLine(x + " " + y);
+                }
             }
         }
-        Console.WriteLine(blocksToMove.Count);
+
         // Delete rows
-        for (int y = rowsToDelete.Min(); y < rowsToDelete.Min() + rowsToDelete.Length; y++)
+        for (int y = rowsToDelete.Min(); y <= rowsToDelete.Max(); y++)
         {
             for (int x = 0; x < grid.GetLength(0); x++)
             {
@@ -268,16 +309,26 @@ public class Board
             }
         }
 
+        // Console.WriteLine(blocksToMove.Count + " " + rowsToDelete.Length);
+
+        // Piece is done???
+
         MoveBlocksToCoords(blocksToMove);
+
+        PieceIsDone(blocksToMove);
     }
     private void PieceIsDone(Dictionary<(int, int), (int, int)> completedPiece)
     {
-        foreach (Block block in grid)
+        for (int x = 0; x < grid.GetLength(0); x++)
         {
-            if (block != null)
-                block.isActive = false;
+            for (int y = 0; y < grid.GetLength(1); y++)
+            {
+                if (grid[x, y] != null && (completedPiece.ContainsKey((x, y)) || completedPiece.ContainsValue((x, y))))
+                    grid[x, y].isActive = false;
+            }
         }
         DeleteFullRows();
+        SpawnPiece();
     }
     #endregion
     #region Data gathering
