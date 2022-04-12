@@ -8,6 +8,7 @@ Raylib.SetTargetFPS(60);
 
 while (!Raylib.WindowShouldClose())
 {
+    Timer.Update();
     board.Update();
 
     Raylib.BeginDrawing();

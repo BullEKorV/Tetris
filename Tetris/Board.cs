@@ -2,25 +2,14 @@ public class Board
 {
     public Block[,] grid;
     List<Piece> piecesUpNext = new List<Piece>();
-    readonly float timeBetweenUpdate = 0.2f;
-    float timeTillNextUpdate;
     public Board()
     {
         grid = new Block[10, 21];
-        timeTillNextUpdate = timeBetweenUpdate;
     }
     public void Update()
     {
-        timeTillNextUpdate -= Raylib.GetFrameTime();
+        Move playerMove = KeyRegistring();
 
-        Move playerMove = Move.None;
-        // Get player move
-        if (Raylib.IsKeyPressed(KeyboardKey.KEY_A))
-            playerMove = Move.Left;
-        if (Raylib.IsKeyPressed(KeyboardKey.KEY_D))
-            playerMove = Move.Right;
-        if (Raylib.IsKeyPressed(KeyboardKey.KEY_S))
-            playerMove = Move.Down;
         if (Raylib.IsKeyPressed(KeyboardKey.KEY_SPACE))
             playerMove = Move.InstaDown;
 
@@ -28,6 +17,7 @@ public class Board
         if (Raylib.IsKeyPressed(KeyboardKey.KEY_C))
             SpawnPiece();
 
+        // Add piece to upnext list
         while (piecesUpNext.Count < 3)
             piecesUpNext.Add(GetPiece());
 
@@ -35,11 +25,52 @@ public class Board
         MoveActiveBlocks(playerMove);
 
         // Perform a "game tick"
-        if (timeTillNextUpdate <= 0)
+        if (Timer.autoDrop <= 0)
         {
             MoveActiveBlocks(Move.Down);
-            timeTillNextUpdate = timeBetweenUpdate;
+            Timer.ResetAutoDrop();
         }
+
+        if (Timer.placePiece <= 0) PieceIsDone();
+    }
+    private Move KeyRegistring()
+    {
+        if (Raylib.IsKeyPressed(KeyboardKey.KEY_LEFT))
+        {
+            Timer.KeyTimerDelay();
+            return Move.Left;
+        }
+        if (Raylib.IsKeyPressed(KeyboardKey.KEY_RIGHT))
+        {
+            Timer.KeyTimerDelay();
+            return Move.Right;
+        }
+        if (Raylib.IsKeyPressed(KeyboardKey.KEY_DOWN))
+        {
+            Timer.KeyTimerDelay();
+            Timer.ResetAutoDrop();
+            return Move.Down;
+        }
+
+        if (!Timer.CanAutoRepeat()) return Move.None;
+
+        if (Raylib.IsKeyDown(KeyboardKey.KEY_LEFT))
+        {
+            Timer.KeyTimerSpeed();
+            return Move.Left;
+        }
+        if (Raylib.IsKeyDown(KeyboardKey.KEY_RIGHT))
+        {
+            Timer.KeyTimerSpeed();
+            return Move.Right;
+        }
+        if (Raylib.IsKeyDown(KeyboardKey.KEY_DOWN))
+        {
+            Timer.KeyTimerSpeed();
+            Timer.ResetAutoDrop();
+            return Move.Down;
+        }
+        return Move.None;
     }
     #region Spawning
     private void SpawnPiece()
@@ -56,7 +87,7 @@ public class Board
             grid[(grid.GetLength(0) / 2) - pieceCenterX + block.Item1, block.Item2] = new Block(piece.color);
         }
 
-        timeTillNextUpdate = timeBetweenUpdate;
+        Timer.ResetAutoDrop();
     }
     private int GetPieceWidth(Piece piece)
     {
@@ -89,27 +120,27 @@ public class Board
            {(0,0),
             (1,0),
             (0,1),
-            (1,1)}
-        //     new (int,int)[] // L piece right
-        //    {(0,1),
-        //     (1,1),
-        //     (2,1),
-        //     (2,0)},
-        //     new (int,int)[] // L piece left
-        //    {(0,0),
-        //     (0,1),
-        //     (1,1),
-        //     (2,1)},
-        //     new (int,int)[] // Squiggly piece left
-        //    {(0,0),
-        //     (1,0),
-        //     (1,1),
-        //     (2,1)},
-        //     new (int,int)[] // Squiggly piece right
-        //    {(0,1),
-        //     (1,1),
-        //     (1,0),
-        //     (2,0)}
+            (1,1)},
+            new (int,int)[] // L piece right
+           {(0,1),
+            (1,1),
+            (2,1),
+            (2,0)},
+            new (int,int)[] // L piece left
+           {(0,0),
+            (0,1),
+            (1,1),
+            (2,1)},
+            new (int,int)[] // Squiggly piece left
+           {(0,0),
+            (1,0),
+            (1,1),
+            (2,1)},
+            new (int,int)[] // Squiggly piece right
+           {(0,1),
+            (1,1),
+            (1,0),
+            (2,0)}
         };
         List<Color> allColors = new List<Color>() { Color.RED, Color.BLUE, Color.YELLOW, Color.PINK };
 
@@ -126,6 +157,15 @@ public class Board
         if (move == Move.None) return;
 
         Dictionary<(int, int), (int, int)> blocksToMove = new Dictionary<(int, int), (int, int)>(); // Lists of all blocks that has already been moved so we dont accidentally move same block twice
+
+        // For the insta down move
+        if (move == Move.InstaDown)
+        {
+            blocksToMove = GetPiecePositionInstaDown();
+            MoveBlocksToCoords(blocksToMove); // Valid move is gonna return true, so need to call Piece is done right after
+            PieceIsDone();
+            return;
+        }
 
         // Get the desired new location for all of the blocks
         for (int x = 0; x < grid.GetLength(0); x++)
@@ -144,30 +184,13 @@ public class Board
             }
         }
 
-        // For the insta down move
-        if (move == Move.InstaDown)
-        {
-            blocksToMove = GetPiecePositionInstaDown();
-            MoveBlocksToCoords(blocksToMove);
-            PieceIsDone(blocksToMove);
-            return;
-        }
-
         // Move blocks to coords specified
         MoveBlocksToCoords(blocksToMove);
     }
 
     private void MoveBlocksToCoords(Dictionary<(int, int), (int, int)> blocksToMove)
     {
-        // Find color of the piece
-        // Color pieceColor = GetActiveColor();
-
-        foreach (var blok in blocksToMove)
-        {
-            // Console.WriteLine(blok.Key.Item1 + " " + blok.Key.Item2 + " " + blok.Value.Item1 + " " + blok.Value.Item2);
-        }
-
-        Console.WriteLine(blocksToMove.Count);
+        // Find color of all blocks to be moved
 
         List<Color> blockColors = new List<Color>();
         for (int x = 0; x < grid.GetLength(0); x++)
@@ -176,16 +199,7 @@ public class Board
             {
                 if (blocksToMove.ContainsKey((x, y)))
                 {
-                    // Console.WriteLine(blocksToMove.Count + " " + blockColors.Count);
-                    try
-                    {
-                        blockColors.Add(grid[x, y].color);
-
-                    }
-                    catch (System.Exception e)
-                    {
-                        Console.WriteLine(e.Message);
-                    }
+                    blockColors.Add(grid[x, y].color);
                 }
             }
         }
@@ -247,6 +261,7 @@ public class Board
     }
     private bool ValidMove(Dictionary<(int, int), (int, int)> blocksToMove)
     {
+        bool isDown = false;
         // Check if the blocks can be moved
         for (int x = 0; x < grid.GetLength(0); x++)
         {
@@ -254,6 +269,11 @@ public class Board
             {
                 if (blocksToMove.ContainsKey((x, y)))
                 {
+                    // Reset placetimer if can move down again
+                    if (blocksToMove[(x, y)].Item2 >= y)
+                    {
+                        isDown = true;
+                    }
                     // Check if colliding with walls
                     if (blocksToMove[(x, y)].Item1 > grid.GetLength(0) - 1 || blocksToMove[(x, y)].Item1 < 0)
                     {
@@ -262,7 +282,7 @@ public class Board
                     // Check if at bottom
                     if (blocksToMove[(x, y)].Item2 > grid.GetLength(1) - 1)
                     {
-                        PieceIsDone(blocksToMove);
+                        Timer.StartPlacePieceTimer();
                         return false;
                     }
                     // Check if inactive block at location
@@ -270,12 +290,13 @@ public class Board
                     {
                         // Piece is done if inactive block underneath
                         if (blocksToMove[(x, y)].Item2 > y)
-                            PieceIsDone(blocksToMove);
+                            Timer.StartPlacePieceTimer();
                         return false;
                     }
                 }
             }
         }
+        if (isDown) Timer.StopPlacePieceTimer();
         return true;
     }
     private void DeleteFullRows()
@@ -295,7 +316,6 @@ public class Board
                 {
                     blocksToMove.Add((x, y), (x, y + rowsToDelete.Length));
                     grid[x, y].isActive = true;
-                    Console.WriteLine(x + " " + y);
                 }
             }
         }
@@ -309,21 +329,27 @@ public class Board
             }
         }
 
-        // Console.WriteLine(blocksToMove.Count + " " + rowsToDelete.Length);
-
-        // Piece is done???
-
         MoveBlocksToCoords(blocksToMove);
 
-        PieceIsDone(blocksToMove);
-    }
-    private void PieceIsDone(Dictionary<(int, int), (int, int)> completedPiece)
-    {
+        // Make the blocks unactive ( cant use piece is done because then it spawns 2 pieces.. Maybe fix?)
         for (int x = 0; x < grid.GetLength(0); x++)
         {
             for (int y = 0; y < grid.GetLength(1); y++)
             {
-                if (grid[x, y] != null && (completedPiece.ContainsKey((x, y)) || completedPiece.ContainsValue((x, y))))
+                if (grid[x, y] != null && (blocksToMove.ContainsKey((x, y)) || blocksToMove.ContainsValue((x, y))))
+                    grid[x, y].isActive = false;
+            }
+        }
+    }
+    private void PieceIsDone()
+    {
+        Timer.StopPlacePieceTimer();
+
+        for (int x = 0; x < grid.GetLength(0); x++)
+        {
+            for (int y = 0; y < grid.GetLength(1); y++)
+            {
+                if (grid[x, y] != null)
                     grid[x, y].isActive = false;
             }
         }
@@ -373,7 +399,10 @@ public class Board
             {
                 if (grid[x, y] != null)
                 {
-                    Raylib.DrawRectangle(x * blockSize + (int)arena.x + 1, y * blockSize + (int)arena.y + 1, blockSize - 2, blockSize - 2, grid[x, y].color);
+                    if (!grid[x, y].isActive)
+                        Raylib.DrawRectangle(x * blockSize + (int)arena.x + 1, y * blockSize + (int)arena.y + 1, blockSize - 2, blockSize - 2, grid[x, y].color);
+                    else if (grid[x, y].isActive)
+                        Raylib.DrawRectangle(x * blockSize + (int)arena.x + 1, y * blockSize + (int)arena.y + 1, blockSize - 2, blockSize - 2, new Color(grid[x, y].color.r, grid[x, y].color.g, grid[x, y].color.b, (byte)(255 * Timer.placePiece * (1 / Timer.placePieceTimeMax))));
                 }
             }
         }
