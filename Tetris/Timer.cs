@@ -1,6 +1,6 @@
 public class Timer
 {
-    readonly static float timeBetweenAutoDrop = 0.7f;
+    readonly static float timeBetweenAutoDrop = 100.7f;
     public static float autoDrop = timeBetweenAutoDrop;
     public static float keyTimer;
     readonly static float autoRepeatDelay = 0.25f;

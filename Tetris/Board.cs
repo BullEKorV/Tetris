@@ -8,18 +8,19 @@ public class Board
     }
     public void Update()
     {
-        Move playerMove = KeyRegistring();
+        // Rotate piece
+        Move playerRotate = Move.None;
+        if (Raylib.IsKeyPressed(KeyboardKey.KEY_Z))
+            playerRotate = Move.Left;
+        if (Raylib.IsKeyPressed(KeyboardKey.KEY_X))
+            playerRotate = Move.Right;
+        RotatePiece(playerRotate);
 
+        // Move piece
+        Move playerMove = KeyRegistring();
         if (Raylib.IsKeyPressed(KeyboardKey.KEY_SPACE))
             playerMove = Move.InstaDown;
 
-        // DEBUG
-        if (Raylib.IsKeyPressed(KeyboardKey.KEY_C))
-            SpawnPiece();
-
-        // Add piece to upnext list
-        while (piecesUpNext.Count < 3)
-            piecesUpNext.Add(GetPiece());
 
         // Commit to player move
         MoveActiveBlocks(playerMove);
@@ -32,7 +33,67 @@ public class Board
         }
 
         if (Timer.placePiece <= 0) PieceIsDone();
+
+        // DEBUG
+        if (Raylib.IsKeyPressed(KeyboardKey.KEY_C))
+            SpawnPiece();
+
+        // Add piece to upnext list
+        while (piecesUpNext.Count < 3)
+            piecesUpNext.Add(GetPiece());
     }
+    #region Rotate blocks
+    private void RotatePiece(Move playerRotate)
+    {
+        if (playerRotate == Move.None) return;
+
+        // Find active blocks to rotate and add to list
+        List<(int, int)> blocksToRotate = new List<(int, int)>();
+        for (int x = 0; x < grid.GetLength(0); x++)
+        {
+            for (int y = 0; y < grid.GetLength(1); y++)
+            {
+                if (grid[x, y] != null && grid[x, y].isActive)
+                    blocksToRotate.Add((x, y));
+            }
+        }
+
+        // Get piece width and height
+        (int, int) topLeftCoords = GetPieceCornerCoords(blocksToRotate);
+        int size = (int)MathF.Max(GetPieceWidth(blocksToRotate), GetPieceHeight(blocksToRotate));
+        (int, int) midCoords = ((size - 1) / 2, (size - 1) / 2);
+
+        Console.WriteLine(midCoords.Item1 + " " + midCoords.Item2);
+
+        Dictionary<(int, int), (int, int)> blocksToMove = new Dictionary<(int, int), (int, int)>();
+        foreach (var block in blocksToRotate)
+        {
+            (int, int) newLocalCoords = (0, 0);
+            if (playerRotate == Move.Left)
+                newLocalCoords = ((block.Item2 - topLeftCoords.Item2 - midCoords.Item2) * -1, (block.Item1 - topLeftCoords.Item1 - midCoords.Item1));
+
+            blocksToMove.Add((block.Item1, block.Item2), (topLeftCoords.Item1 + midCoords.Item1 - newLocalCoords.Item1, topLeftCoords.Item2 + midCoords.Item2 - newLocalCoords.Item2));
+        }
+
+        MoveBlocksToCoords(blocksToMove);
+    }
+    // private (int, int) GetMidCoordsFromPiece(List<(int, int) blocks)
+    // {
+
+    // }
+    private (int, int) GetPieceCornerCoords(List<(int, int)> piece)
+    {
+        int minX = grid.GetLength(0);
+        int minY = grid.GetLength(1);
+
+        foreach ((int, int) block in piece)
+        {
+            minX = block.Item1 < minX ? block.Item1 : minX;
+            minY = block.Item2 < minY ? block.Item2 : minY;
+        }
+        return (minX, minY);
+    }
+    #endregion
     private Move KeyRegistring()
     {
         if (Raylib.IsKeyPressed(KeyboardKey.KEY_LEFT))
@@ -79,7 +140,7 @@ public class Board
         piecesUpNext.Remove(piece);
 
         // Find center 
-        int pieceCenterX = (int)MathF.Ceiling((float)GetPieceWidth(piece) / 2);
+        int pieceCenterX = (int)MathF.Ceiling((float)GetPieceWidth(piece.blocks.ToList()) / 2);
 
         // Actually place block
         foreach ((int, int) block in piece.blocks)
@@ -89,23 +150,27 @@ public class Board
 
         Timer.ResetAutoDrop();
     }
-    private int GetPieceWidth(Piece piece)
+    private int GetPieceWidth(List<(int, int)> piece)
     {
+        int minX = grid.GetLength(0); // To be able to get piece from corner 
         int width = 0;
-        foreach ((int, int) block in piece.blocks)
+        foreach ((int, int) block in piece)
         {
             width = block.Item1 > width ? block.Item1 : width;
+            minX = block.Item1 < minX ? block.Item1 : minX;
         }
-        return width + 1; // +1 because array ints start at 0
+        return width + 1 - minX; // +1 because array ints start at 0
     }
-    private int GetPieceHeight(Piece piece)
+    private int GetPieceHeight(List<(int, int)> piece)
     {
+        int minY = grid.GetLength(1); // To be able to get piece from corner 
         int height = 0;
-        foreach ((int, int) block in piece.blocks)
+        foreach ((int, int) block in piece)
         {
             height = block.Item2 > height ? block.Item2 : height;
+            minY = block.Item2 < minY ? block.Item2 : minY;
         }
-        return height + 1; // +1 because array ints start at 0
+        return height + 1 - minY; // +1 because array ints start at 0
     }
 
     private Piece GetPiece()
@@ -140,7 +205,12 @@ public class Board
            {(0,1),
             (1,1),
             (1,0),
-            (2,0)}
+            (2,0)},
+            new (int,int)[] // Half plus
+           {(1,0),
+            (1,1),
+            (0,1),
+            (2,1)}
         };
         List<Color> allColors = new List<Color>() { Color.RED, Color.BLUE, Color.YELLOW, Color.PINK };
 
@@ -275,7 +345,7 @@ public class Board
                         isDown = true;
                     }
                     // Check if colliding with walls
-                    if (blocksToMove[(x, y)].Item1 > grid.GetLength(0) - 1 || blocksToMove[(x, y)].Item1 < 0)
+                    if (blocksToMove[(x, y)].Item1 > grid.GetLength(0) - 1 || blocksToMove[(x, y)].Item1 < 0 || blocksToMove[(x, y)].Item2 < 0)
                     {
                         return false;
                     }
