@@ -5,6 +5,8 @@ public class Board
     public Board()
     {
         grid = new Block[10, 21];
+        piecesUpNext.Add(GetPiece());
+        SpawnPiece();
     }
     public void Update()
     {
@@ -33,10 +35,6 @@ public class Board
         }
 
         if (Timer.placePiece <= 0) PieceIsDone();
-
-        // DEBUG
-        if (Raylib.IsKeyPressed(KeyboardKey.KEY_C))
-            SpawnPiece();
 
         // Add piece to upnext list
         while (piecesUpNext.Count < 3)
@@ -70,6 +68,8 @@ public class Board
         {
             (int, int) newLocalCoords = (0, 0);
             if (playerRotate == Move.Left)
+                newLocalCoords = ((block.Item2 - topLeftCoords.Item2 - midCoords.Item2), (block.Item1 - topLeftCoords.Item1 - midCoords.Item1) * -1);
+            if (playerRotate == Move.Right)
                 newLocalCoords = ((block.Item2 - topLeftCoords.Item2 - midCoords.Item2) * -1, (block.Item1 - topLeftCoords.Item1 - midCoords.Item1));
 
             blocksToMove.Add((block.Item1, block.Item2), (topLeftCoords.Item1 + midCoords.Item1 - newLocalCoords.Item1, topLeftCoords.Item2 + midCoords.Item2 - newLocalCoords.Item2));
@@ -212,10 +212,11 @@ public class Board
             (0,1),
             (2,1)}
         };
-        List<Color> allColors = new List<Color>() { Color.RED, Color.BLUE, Color.YELLOW, Color.PINK };
+        List<Color> allColors = new List<Color>() { Color.SKYBLUE, Color.YELLOW, Color.ORANGE, Color.BLUE, Color.RED, Color.GREEN, Color.PURPLE };
 
         Random rnd = new Random();
-        Piece piece = new Piece(allPieces[rnd.Next(0, allPieces.Length)], allColors[rnd.Next(0, allColors.Count)]);
+        int rndNumber = rnd.Next(0, allPieces.Length);
+        Piece piece = new Piece(allPieces[rndNumber], allColors[rndNumber]);
 
 
         return piece;
@@ -340,7 +341,7 @@ public class Board
                 if (blocksToMove.ContainsKey((x, y)))
                 {
                     // Reset placetimer if can move down again
-                    if (blocksToMove[(x, y)].Item2 >= y)
+                    if (blocksToMove[(x, y)].Item2 >= y) //  && blocksToMove[(x, y)].Item1 == x 
                     {
                         isDown = true;
                     }

@@ -5,6 +5,7 @@ public class Block
     public Block(Color colr)
     {
         this.color = colr;
-        isActive = true;
+        this.isActive = true;
+        // this.rotateAround = rotateAround;
     }
 }

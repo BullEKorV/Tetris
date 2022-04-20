@@ -5,7 +5,7 @@ public class Timer
     public static float keyTimer;
     readonly static float autoRepeatDelay = 0.25f;
     readonly static float autoRepeatSpeed = 0.05f;
-    readonly public static float placePieceTimeMax = 0.8f;
+    readonly public static float placePieceTimeMax = 0.6f;
     // Gives the player extra time before the piece gets placed
     public static float placePiece = placePieceTimeMax;
     static bool pieceTouchingBlock = false;
